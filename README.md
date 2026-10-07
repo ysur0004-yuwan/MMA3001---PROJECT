@@ -1,13 +1,38 @@
 # PROJECT NAME
 
+An Automated Detection of Pork Rasher Packaging Errors - MMA3001 PROJECT 
+
+A computer vision system that classifies images of pork rasher trays as a pass or a fail based on the presence of a packaging or product defect, with the extension to classify the specific defect type, loose meat, twisted meat, unsealed packaging, wrinkles, and supporting a human in the loop for the quality inspection decision. 
+
 
 # FEATURES
+
+Binary image classification, a pass or fail based on the presence of a packaging defect. 
+
+Multi class classification to identify the specific defect type where a defect is present 
+
+Image level labels derived from the data sets original bounding box annotations 
+
+Baseline vs an improved model comparison 
+
+Validation against a predefined train, validation, split
+
+
+# TECH STACK 
+
+Framework being used is Tensor Flow  using transfer learning 
+Environment is on google colab 
+Dataset tooling from roboflow, converted from bounding box to image level labels for classification 
 
 
 # LICENSES 
 
+Note on dataset licensing: the training data is sourced from the "Pork Rasher Error Packaging" Dataset on Roboflow Universe. See citation below. Released under a CC BY 4.0 License. The data set is not redistributed in this repository. 
 
 # CITATION 
+
+Dataset: Pork Rasher Error (Packaging), by Hello, Roboflow Universe, 2025. 
+Available at: https://universe.roboflow.com/hello-2aqe0/pork-rasher-error-packaging Licence: CC BY 4.0
 
 
 # AI ACKNOWLEDGEMENT 
