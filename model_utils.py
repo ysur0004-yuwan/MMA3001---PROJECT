@@ -18,8 +18,10 @@ Docstring style: Google style, consistent with data_utils.py.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import tensorflow as tf
+from sklearn.metrics import classification_report, confusion_matrix
 
 # Must match IMAGE_SIZE in data_utils.py, since the model's input layer has
 # to agree with the shape produced by the data pipeline.
@@ -155,3 +157,73 @@ def train_baseline_model(
         callbacks=callbacks,
     )
     return history
+
+
+def evaluate_pass_fail_model(
+    model: tf.keras.Model,
+    dataset: tf.data.Dataset,
+    class_names: tuple[str, str] = ("pass", "fail"),
+    threshold: float = 0.5,
+) -> dict:
+    """Evaluates a trained pass/fail model on a held-out dataset.
+
+    This is the function used for final reporting (Section 5, Validation),
+    and should always be called on the TEST split, never on validation or
+    training data, to give an honest estimate of real-world performance.
+    Validation data was already used during training to pick the best
+    checkpoint (see train_baseline_model), so it cannot also serve as an
+    unbiased final result.
+
+    Args:
+        model: A trained model, e.g. the output of train_baseline_model().
+        dataset: The dataset to evaluate on — should be the test split,
+            built with shuffle=False so predictions stay aligned with the
+            correct images (order doesn't actually matter for metrics, but
+            shuffle=False is good practice for reproducible evaluation).
+        class_names: Human-readable names for (negative_class, positive_class),
+            i.e. (pass, fail), used to label the classification report.
+        threshold: Probability threshold above which a prediction counts as
+            "fail" (the positive class). 0.5 is the standard default; a
+            different threshold could be justified in Section 6
+            (Optimisation) if precision/recall trade-offs are explored.
+
+    Returns:
+        A dict with keys: "y_true", "y_pred", "y_pred_probs" (numpy arrays),
+        and "confusion_matrix" (2x2 numpy array), for further analysis or
+        plotting if needed.
+    """
+    y_true = []
+    y_pred_probs = []
+
+    # Iterate the dataset once, collecting true labels and predicted
+    # probabilities batch by batch.
+    for images, labels in dataset:
+        y_true.extend(labels.numpy())
+        batch_probs = model.predict(images, verbose=0)
+        y_pred_probs.extend(batch_probs.flatten())
+
+    y_true = np.array(y_true)
+    y_pred_probs = np.array(y_pred_probs)
+    y_pred = (y_pred_probs >= threshold).astype(int)
+
+    # zero_division=0 avoids a crash if a class is ever entirely absent or
+    # entirely unpredicted — important given how thin some classes are
+    # elsewhere in this project (see Section 2, wrinkle class).
+    report = classification_report(
+        y_true, y_pred, target_names=list(class_names), zero_division=0
+    )
+    cm = confusion_matrix(y_true, y_pred)
+
+    print("Classification report (test set):")
+    print(report)
+    print("Confusion matrix (rows = true, columns = predicted):")
+    print(f"               pred_{class_names[0]}   pred_{class_names[1]}")
+    print(f"true_{class_names[0]:<8}  {cm[0][0]:>10}  {cm[0][1]:>10}")
+    print(f"true_{class_names[1]:<8}  {cm[1][0]:>10}  {cm[1][1]:>10}")
+
+    return {
+        "y_true": y_true,
+        "y_pred": y_pred,
+        "y_pred_probs": y_pred_probs,
+        "confusion_matrix": cm,
+    }
