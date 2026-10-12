@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+.ipynb_checkpoints/
+
+# Secrets: NEVER commit your Roboflow API key
+.env
+
+# Data and trained models are large and re-creatable; do not commit them
+Pork-Rasher-Error*/
+data/
+*.keras
+*.h5
