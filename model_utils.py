@@ -36,6 +36,7 @@ INPUT_SHAPE = (224, 224, 3)
 def build_baseline_model(
     input_shape: tuple[int, int, int] = INPUT_SHAPE,
     learning_rate: float = 1e-4,
+    weights: str | None = "imagenet",
 ) -> tf.keras.Model:
     """Builds the baseline pass/fail classifier.
 
@@ -49,6 +50,10 @@ def build_baseline_model(
         learning_rate: Learning rate for the Adam optimiser. 1e-4 is a
             conservative default appropriate for fine-tuning a small head on
             top of a frozen pretrained backbone.
+        weights: Backbone weights to load. "imagenet" (the default, used
+            for all reported results) downloads pretrained weights; None
+            gives a randomly initialised backbone of identical shape, which
+            the unit tests use so they can run offline.
 
     Returns:
         A compiled tf.keras.Model, ready to call .fit() on.
@@ -56,7 +61,7 @@ def build_baseline_model(
     base_model = tf.keras.applications.MobileNetV2(
         input_shape=input_shape,
         include_top=False,
-        weights="imagenet",
+        weights=weights,
     )
     # Baseline choice: freeze the backbone entirely. We are only training the
     # new classification head, which keeps the baseline fast and simple.
@@ -291,6 +296,7 @@ def build_defect_type_model(
     num_classes: int,
     input_shape: tuple[int, int, int] = INPUT_SHAPE,
     learning_rate: float = 1e-4,
+    weights: str | None = "imagenet",
 ) -> tf.keras.Model:
     """Builds the defect-type extension model (multi-class classifier).
 
@@ -303,6 +309,8 @@ def build_defect_type_model(
             loose-meat, packaging-error, twisted-meat, unsealed, wrinkle).
         input_shape: Shape of the input images.
         learning_rate: Learning rate for the Adam optimiser.
+        weights: Backbone weights to load ("imagenet" by default, or None
+            for a randomly initialised backbone, as used by the unit tests).
 
     Returns:
         A compiled tf.keras.Model, ready to call .fit() on. Expects
@@ -312,7 +320,7 @@ def build_defect_type_model(
     base_model = tf.keras.applications.MobileNetV2(
         input_shape=input_shape,
         include_top=False,
-        weights="imagenet",
+        weights=weights,
     )
     base_model.trainable = False  # frozen, as in the core-task baseline
 
