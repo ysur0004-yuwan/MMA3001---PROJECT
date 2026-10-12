@@ -1,0 +1,7 @@
+Name                 Stmts   Miss  Cover   Missing
+--------------------------------------------------
+src/data_utils.py      103      5    95%   223-227
+src/model_utils.py      90      0   100%
+--------------------------------------------------
+TOTAL                  193      5    97%
+(5 uncovered lines in data_utils.py, 223-227, are the body of the tf.data map function. It runs inside TensorFlow's compiled graph, so the coverage tool cannot observe it; its behaviour is verified by test_pass_fail_dataset_shapes_range_and_labels.)
