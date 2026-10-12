@@ -204,6 +204,29 @@ def summarise_labels(df: pd.DataFrame) -> None:
     print(f"\nMulti-defect images excluded from extension task: {int(df['is_multi_defect'].sum())}")
 
 
+def _load_and_preprocess_image(path: tf.Tensor, label: tf.Tensor) -> tuple[tf.Tensor, tf.Tensor]:
+    """Reads a single image file off disk and prepares it for the model.
+
+    Shared by both make_pass_fail_dataset() and make_defect_type_dataset(),
+    since both tasks use identical image preprocessing — only the label
+    meaning differs between the two tasks, not how the image itself is
+    read, resized, or normalised.
+
+    Args:
+        path: A scalar string tensor, the image file path.
+        label: A scalar integer tensor, passed through unchanged.
+
+    Returns:
+        A tuple (image, label), where image is a (224, 224, 3) float32
+        tensor with pixel values normalised to [0, 1].
+    """
+    image = tf.io.read_file(path)
+    image = tf.image.decode_jpeg(image, channels=3)
+    image = tf.image.resize(image, IMAGE_SIZE)
+    image = image / 255.0  # normalise pixel values to [0, 1]
+    return image, label
+
+
 def make_pass_fail_dataset(df: pd.DataFrame, split: str, shuffle: bool = True) -> tf.data.Dataset:
     """Builds a tf.data.Dataset for the core pass/fail classification task.
 
@@ -226,17 +249,52 @@ def make_pass_fail_dataset(df: pd.DataFrame, split: str, shuffle: bool = True) -
     labels = split_df["label"].tolist()
 
     ds = tf.data.Dataset.from_tensor_slices((paths, labels))
-
-    def _load_and_preprocess(path, label):
-        """Reads an image file off disk and prepares it for the model."""
-        image = tf.io.read_file(path)
-        image = tf.image.decode_jpeg(image, channels=3)
-        image = tf.image.resize(image, IMAGE_SIZE)
-        image = image / 255.0  # normalise pixel values to [0, 1]
-        return image, label
-
-    ds = ds.map(_load_and_preprocess, num_parallel_calls=tf.data.AUTOTUNE)
+    ds = ds.map(_load_and_preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
     if shuffle:
-        ds = ds.shuffle(buffer_size=len(paths))
+        ds = ds.shuffle(buffer_size=max(len(paths), 1))
+    ds = ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
+    return ds
+
+
+def make_defect_type_dataset(
+    df: pd.DataFrame,
+    split: str,
+    class_names: list[str],
+    shuffle: bool = True,
+) -> tf.data.Dataset:
+    """Builds a tf.data.Dataset for the defect-type extension task.
+
+    Only images with a single, unambiguous defect type are included in this
+    dataset — pass images and the multi-defect images (extension_label is
+    None for both, per build_image_level_labels()) are excluded, per the
+    project's documented labelling policy (Section 2 of the project
+    documentation).
+
+    Args:
+        df: The DataFrame returned by build_image_level_labels().
+        split: Which split to build the dataset for ("train", "valid", "test").
+        class_names: Class ID -> name mapping, from load_class_names(). Used
+            to map each defect-type string label to a fixed integer index,
+            consistent across all three splits.
+        shuffle: Whether to shuffle the dataset. Should be True for training
+            and False for validation/test.
+
+    Returns:
+        A batched, prefetched tf.data.Dataset yielding (image, label) pairs,
+        where image is a (224, 224, 3) float32 tensor normalised to [0, 1],
+        and label is an integer class index into class_names.
+    """
+    split_df = df[(df["split"] == split) & (df["extension_label"].notna())].copy()
+
+    label_to_index = {name: i for i, name in enumerate(class_names)}
+    split_df["label_idx"] = split_df["extension_label"].map(label_to_index)
+
+    paths = split_df["image_path"].tolist()
+    labels = split_df["label_idx"].tolist()
+
+    ds = tf.data.Dataset.from_tensor_slices((paths, labels))
+    ds = ds.map(_load_and_preprocess_image, num_parallel_calls=tf.data.AUTOTUNE)
+    if shuffle:
+        ds = ds.shuffle(buffer_size=max(len(paths), 1))
     ds = ds.batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
     return ds

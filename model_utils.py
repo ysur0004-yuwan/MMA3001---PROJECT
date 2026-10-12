@@ -1,14 +1,19 @@
 """model_utils.py
 
-Model-building and training utilities for the pass/fail classification task.
+Model-building and training utilities for both classification tasks: the
+core pass/fail task, and the defect-type extension task. Also includes the
+simple-CNN alternative model used as a comparison point against the
+transfer-learning baseline (Section 4, Alternative Solutions).
 
-The baseline model uses transfer learning with a frozen MobileNetV2 backbone
-(pretrained on ImageNet) plus a small trainable classification head. This is
-a deliberate "simple first" choice: freezing the backbone means we are only
-training a handful of new parameters, which trains fast and is unlikely to
-overfit on a dataset of this size — a sensible baseline before attempting
-anything more complex (see Section 4, Alternative Solutions, for the planned
-comparison against this baseline).
+The baseline models (both tasks) use transfer learning with a frozen
+MobileNetV2 backbone (pretrained on ImageNet) plus a small trainable
+classification head. This is a deliberate "simple first" choice: freezing
+the backbone means we are only training a handful of new parameters, which
+trains fast and is unlikely to overfit on a dataset of this size.
+
+The alternative model (build_simple_cnn_model) trains a small CNN entirely
+from scratch, with no pretrained weights, as a genuinely different approach
+to compare against the baseline on accuracy, size, and training behaviour.
 
 Project: MMA3001 Individual Project — Automated Classification of Pork
 Rasher Packaging Errors.
@@ -227,3 +232,199 @@ def evaluate_pass_fail_model(
         "y_pred_probs": y_pred_probs,
         "confusion_matrix": cm,
     }
+
+
+def build_simple_cnn_model(
+    input_shape: tuple[int, int, int] = INPUT_SHAPE,
+    learning_rate: float = 1e-4,
+) -> tf.keras.Model:
+    """Builds the alternative pass/fail model: a small CNN trained from scratch.
+
+    This model has no pretrained weights at all — every parameter is
+    randomly initialised and learned purely from this project's training
+    data. It exists specifically as a comparison point against
+    build_baseline_model(), to test whether transfer learning is actually
+    necessary given this project's data volume (see Section 4, Alternative
+    Solutions, for the result and interpretation of this comparison).
+
+    Args:
+        input_shape: Shape of the input images. Must match the baseline
+            model's input shape for a fair comparison.
+        learning_rate: Learning rate for the Adam optimiser. Kept identical
+            to the baseline's learning rate so architecture, not
+            hyperparameters, is the variable being compared.
+
+    Returns:
+        A compiled tf.keras.Model, ready to call .fit() on.
+    """
+    model = tf.keras.Sequential([
+        tf.keras.Input(shape=input_shape),
+
+        tf.keras.layers.Conv2D(16, 3, activation="relu", padding="same"),
+        tf.keras.layers.MaxPooling2D(),
+
+        tf.keras.layers.Conv2D(32, 3, activation="relu", padding="same"),
+        tf.keras.layers.MaxPooling2D(),
+
+        tf.keras.layers.Conv2D(64, 3, activation="relu", padding="same"),
+        tf.keras.layers.MaxPooling2D(),
+
+        tf.keras.layers.GlobalAveragePooling2D(),
+        tf.keras.layers.Dense(64, activation="relu"),
+        tf.keras.layers.Dropout(0.3),
+        tf.keras.layers.Dense(1, activation="sigmoid"),
+    ], name="simple_cnn_from_scratch")
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        loss="binary_crossentropy",
+        metrics=[
+            "accuracy",
+            tf.keras.metrics.Precision(name="precision"),
+            tf.keras.metrics.Recall(name="recall"),
+        ],
+    )
+    return model
+
+
+def build_defect_type_model(
+    num_classes: int,
+    input_shape: tuple[int, int, int] = INPUT_SHAPE,
+    learning_rate: float = 1e-4,
+) -> tf.keras.Model:
+    """Builds the defect-type extension model (multi-class classifier).
+
+    Architecture is identical to build_baseline_model() except for the
+    output layer, which uses num_classes softmax units instead of a single
+    sigmoid unit, since this is a multi-class (not binary) task.
+
+    Args:
+        num_classes: Number of defect-type classes (5 for this project:
+            loose-meat, packaging-error, twisted-meat, unsealed, wrinkle).
+        input_shape: Shape of the input images.
+        learning_rate: Learning rate for the Adam optimiser.
+
+    Returns:
+        A compiled tf.keras.Model, ready to call .fit() on. Expects
+        integer-encoded labels (not one-hot), since it is compiled with
+        sparse_categorical_crossentropy.
+    """
+    base_model = tf.keras.applications.MobileNetV2(
+        input_shape=input_shape,
+        include_top=False,
+        weights="imagenet",
+    )
+    base_model.trainable = False  # frozen, as in the core-task baseline
+
+    inputs = tf.keras.Input(shape=input_shape)
+    x = base_model(inputs, training=False)
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    outputs = tf.keras.layers.Dense(num_classes, activation="softmax")(x)
+
+    model = tf.keras.Model(inputs, outputs, name="defect_type_classifier")
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"],
+    )
+    return model
+
+
+def compute_multiclass_class_weights(
+    df: pd.DataFrame,
+    class_names: list[str],
+    split: str = "train",
+) -> dict[int, float]:
+    """Computes inverse-frequency class weights for the defect-type task.
+
+    Uses the same inverse-frequency formula as compute_class_weights(), but
+    generalised to an arbitrary number of classes rather than a fixed
+    binary case.
+
+    Note (see Section 6, Optimisation and Performance, of the project
+    documentation): this correction was found to partially overcorrect for
+    the project's most severely imbalanced classes (e.g. wrinkle, with only
+    18 training images, received a weight over 80 times larger than
+    packaging-error). This is documented as an identified limitation, not
+    silently fixed, since a principled resolution (e.g. a capped maximum
+    weight, or focal loss) was not implemented within this project's scope.
+
+    Args:
+        df: The DataFrame returned by build_image_level_labels().
+        class_names: Class ID -> name mapping, from load_class_names().
+        split: Which split to compute weights from. Should always be
+            "train" for the same reason as in compute_class_weights().
+
+    Returns:
+        A dict mapping each integer class index to its class weight,
+        suitable for passing to model.fit(class_weight=...). Classes with
+        zero training examples get a weight of 0.0 rather than raising a
+        division-by-zero error.
+    """
+    split_df = df[(df["split"] == split) & (df["extension_label"].notna())]
+    counts = split_df["extension_label"].value_counts()
+    total = counts.sum()
+    n_classes = len(class_names)
+
+    weights = {}
+    for i, name in enumerate(class_names):
+        count = counts.get(name, 0)
+        weights[i] = total / (n_classes * count) if count > 0 else 0.0
+    return weights
+
+
+def evaluate_defect_type_model(
+    model: tf.keras.Model,
+    dataset: tf.data.Dataset,
+    class_names: list[str],
+) -> dict:
+    """Evaluates a trained defect-type model on a held-out dataset.
+
+    As with evaluate_pass_fail_model(), this should always be called on the
+    test split for final reporting, never on validation or training data.
+
+    Args:
+        model: A trained model, e.g. the output of build_defect_type_model()
+            after fitting.
+        dataset: The dataset to evaluate on — should be the test split,
+            built with shuffle=False.
+        class_names: Class ID -> name mapping, from load_class_names(). Used
+            both to label the classification report and to ensure every
+            class appears in the report even if it has zero examples in
+            this dataset (notably wrinkle — see Section 2 and Section 5 of
+            the project documentation).
+
+    Returns:
+        A dict with keys: "y_true", "y_pred" (numpy arrays), and
+        "confusion_matrix" (numpy array, shape [num_classes, num_classes]).
+    """
+    y_true = []
+    y_pred = []
+
+    for images, labels in dataset:
+        y_true.extend(labels.numpy())
+        probs = model.predict(images, verbose=0)
+        preds = np.argmax(probs, axis=1)  # pick the highest-probability class
+        y_pred.extend(preds)
+
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+
+    # labels=range(len(class_names)) ensures every class gets a row in the
+    # report/matrix, even wrinkle with zero test examples, rather than
+    # silently disappearing from the output.
+    report = classification_report(
+        y_true, y_pred,
+        labels=list(range(len(class_names))),
+        target_names=class_names,
+        zero_division=0,
+    )
+    cm = confusion_matrix(y_true, y_pred, labels=list(range(len(class_names))))
+
+    print("Classification report (test set):")
+    print(report)
+    print(f"Confusion matrix (rows=true, cols=pred), class order: {class_names}")
+    print(cm)
+
+    return {"y_true": y_true, "y_pred": y_pred, "confusion_matrix": cm}
