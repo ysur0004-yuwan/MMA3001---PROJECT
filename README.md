@@ -1,18 +1,14 @@
 # Automated Classification of Pork Rasher Packaging Errors
 
-**MMA3001 Numerical Methods and Machine Learning: Individual Project** (Yuwan Suriyakumara)
+**MMA3001 Numerical Methods and Machine Learning: Project** Yuwan Suriyakumara (ID: 34953302)
 
-A computer-vision decision-support tool for packaging quality control. Given an image of a packaged pork rasher
-tray, it predicts **pass / fail** and, for failed trays, the likely **defect type** (loose-meat, packaging-error,
-twisted-meat, unsealed, wrinkle). It is designed for a human-in-the-loop setting: flagged trays go to an inspector,
-and the system never accepts or rejects product on its own.
 
-The method is transfer learning (a frozen MobileNetV2 backbone with a small trainable head) on the Roboflow
-*Pork Rasher Error (Packaging)* dataset. Bounding-box annotations are converted to image-level labels, so the project
-performs **classification, not object detection**. The full method, validation and limitations are in the written report.
+A computational vision decision support tool, created for packaging quality control. Given an image of a packaged pork rasher tray, it concludes a pass or fail, for failed trays it undergoes a further extension to classify the defect type (loose-meant, packaging error, twisted meat, unsealed, wrinkles). This has been designed for a human in the loop setting, flagged trays will to an inspector, hence the system will never accept or reject a product on its own.  
 
-## Key results
+The method used is transfer learning (a frozen MobileNetV2 backbone with a small trainable head) on the Roboflow
+*Pork Rasher Error (Packaging)* dataset. Bounding box annotations are converted to image level lavels so the project performs classfications rather than object detection. The full method, valdiation, alongside limitations are written in the report. 
 
+## Results 
 All results are from a single training run per model and are evaluated on the dataset's test split.
 
 | Task | Result |
@@ -22,10 +18,8 @@ All results are from a single training run per model and are evaluated on the da
 | From-scratch CNN (comparison) | Collapsed to always predicting "fail" (0 of 12 pass images correct), despite 81x fewer parameters |
 | Defect type (5 classes) | 72% accuracy, only slightly above the 70.8% of always predicting "unsealed"; macro-F1 0.27. Reliable only for `unsealed` (F1 0.92) |
 
-**Important limitations** (detailed in the report): the decision threshold was chosen on the test set, so the metrics at 0.3
-are somewhat optimistic; `wrinkle` has no validation or test examples, so its metrics are undefined; the test set is
-about 85% defective, which a real line probably is not; inference time was not measured; and the two models were not
-evaluated end to end.
+**Important limitations** (detailed in the report): the decision threshold was chosen on the test set, so the metrics at 0.3 are considerably optimistic, further wrinkle has no validation or test examples so its metrics are undefined. The test set is about 85% defective, which in reality, a real line would not be. The interference time was not measured and the two models were not evaluated end to end. 
+
 
 ## Repository structure
 
@@ -57,29 +51,11 @@ scikit-learn are preinstalled.
 
 1. Open `PROJECT.ipynb` in Colab and set *Runtime → Change runtime type → GPU (T4)*.
 2. Get a free [Roboflow](https://roboflow.com) API key and store it as a Colab **Secret** named `ROBOFLOW_API_KEY`
-   (key icon in the left sidebar, with *Notebook access* switched on). Do not paste the key into a cell or commit it.
 3. Choose *Runtime → Run all* (roughly 10 to 15 minutes). The notebook clones this repository, downloads the dataset,
    reproduces the data audit, trains the baseline, the from-scratch CNN and the defect-type model, and prints the tables
    and figure used in the report.
 
 Results vary slightly between runs because random seeds are not fixed.
-
-The modules can also be used directly:
-
-```python
-import sys; sys.path.append("MMA3001---PROJECT/src")
-import data_utils as du, model_utils as mu
-
-class_names = du.load_class_names(dataset_path)
-labels_df   = du.build_image_level_labels(dataset_path, class_names)
-train_ds    = du.make_pass_fail_dataset(labels_df, "train", shuffle=True)
-valid_ds    = du.make_pass_fail_dataset(labels_df, "valid", shuffle=False)
-model       = mu.build_baseline_model()
-mu.train_baseline_model(model, train_ds, valid_ds,
-                        class_weight=mu.compute_class_weights(labels_df))
-```
-
-Local installation: `pip install -r requirements-dev.txt`.
 
 ## Testing
 
@@ -103,8 +79,6 @@ API documentation is generated from the Google-style docstrings with [pdoc](http
 pdoc -d google -o docs/html src/data_utils.py src/model_utils.py
 ```
 
-Open `docs/html/index.html` in a browser.
-
 ## Licences
 
 The code is released under the [MIT License](./LICENSE).
@@ -121,7 +95,7 @@ https://universe.roboflow.com/hello-2aqe0/pork-rasher-error-packaging (CC BY 4.0
 This project was developed with the assistance of an AI tool, in line with the unit's requirements. Full detail and
 reflection are in Section 8 of the written report.
 
-**Tool:** Claude (Anthropic, model Claude Sonnet 5.5), used via claude.ai from START DATE to END DATE. No other AI tool was used.
+**Tool:** Claude (Anthropic, model Claude Sonnet 5.5), used via claude.ai from 15/09/2026 to 22/10/2026 No other AI tool was used.
 
 **What it was used for:**
 - Generating the source code (`data_utils.py`, `model_utils.py`), the pytest suite, the pdoc documentation, this README
