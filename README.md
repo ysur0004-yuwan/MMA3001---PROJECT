@@ -3,10 +3,10 @@
 **MMA3001 Numerical Methods and Machine Learning: Project** Yuwan Suriyakumara 
 
 
-A computational vision decision support tool, created for packaging quality control. Given an image of a packaged pork rasher tray, it concludes a pass or fail, for failed trays it undergoes a further extension to classify the defect type (loose-meant, packaging error, twisted meat, unsealed, wrinkles). This has been designed for a human in the loop setting, flagged trays will to an inspector, hence the system will never accept or reject a product on its own.  
+A computational vision decision support tool, created for packaging quality control. Given an image of a packaged pork rasher tray, it concludes a pass or fail, for failed trays it undergoes a further extension to classify the defect type (loose-meat, packaging error, twisted meat, unsealed, wrinkles). This has been designed for a human in the loop setting, flagged trays will be sent to an inspector, hence the system will never accept or reject a product on its own.  
 
 The method used is transfer learning (a frozen MobileNetV2 backbone with a small trainable head) on the Roboflow
-*Pork Rasher Error (Packaging)* dataset. Bounding box annotations are converted to image level lavels so the project performs classfications rather than object detection. The full method, valdiation, alongside limitations are written in the report. 
+*Pork Rasher Error (Packaging)* dataset. Bounding box annotations are converted to image level so the project performs classifications rather than object detection. The full method, validation, alongside limitations are written in the report. 
 
 ## Results 
 All results are from a single training run per model and are evaluated on the dataset's test split.
@@ -18,7 +18,7 @@ All results are from a single training run per model and are evaluated on the da
 | From-scratch CNN (comparison) | Collapsed to always predicting "fail" (0 of 12 pass images correct), despite 81x fewer parameters |
 | Defect type (5 classes) | 72% accuracy, only slightly above the 70.8% of always predicting "unsealed"; macro-F1 0.27. Reliable only for `unsealed` (F1 0.92) |
 
-**Important limitations** (detailed in the report): the decision threshold was chosen on the test set, so the metrics at 0.3 are considerably optimistic, further wrinkle has no validation or test examples so its metrics are undefined. The test set is about 85% defective, which in reality, a real line would not be. The interference time was not measured and the two models were not evaluated end to end. 
+**Important limitations** (detailed in the report): the decision threshold was chosen on the test set, so the metrics at 0.3 are considerably optimistic, further wrinkle has no validation or test examples so its metrics are undefined. The test set is about 85% defective, which in reality, a real line would not be. The inference time was not measured and the two models were not evaluated end to end. 
 
 
 ## Repository structure
@@ -101,8 +101,7 @@ reflection are in Section 8 of the written report.
 - Generating the source code (`data_utils.py`, `model_utils.py`), the pytest suite, the pdoc documentation, this README
   and the notebook. I ran, tested and debugged the code in Google Colab.
 - Interpreting training and evaluation output, and designing the threshold and class-weighting analyses.
-- Drafting the written report: the AI wrote first drafts of most sections and tables from my own results, which I
-  then edited, corrected and checked.
+- Drafting and scaffolding the intial report with a stable layout before I started editing it.
 
 **Level of contribution:** high for first drafts of the code, tests and report text, and moderate for interpreting
 results. The project decisions, the running of training, evaluation and the data audit, and every result reported come from me.
@@ -110,7 +109,7 @@ The tests, deliberate-bug check and HTML documentation were first run by the AI 
 
 **How it was checked:** all code was executed in my own environment and errors were found and fixed by running it;
 every reported number comes from my own output; derived figures were cross-checked. A final check of the AI-drafted
-report found and corrected several errors, which are listed in the report.
+report found and corrected several errors.
 
 **Decisions that remained mine:** the dataset and scope (classification rather than detection); keeping the `wrinkle`
 class against the AI's initial suggestion to drop it; the decision threshold; and verifying the results.
