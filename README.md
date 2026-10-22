@@ -1,6 +1,6 @@
 # Automated Classification of Pork Rasher Packaging Errors
 
-**MMA3001 Numerical Methods and Machine Learning: Project** Yuwan Suriyakumara (ID: 34953302)
+**MMA3001 Numerical Methods and Machine Learning: Project** Yuwan Suriyakumara 
 
 
 A computational vision decision support tool, created for packaging quality control. Given an image of a packaged pork rasher tray, it concludes a pass or fail, for failed trays it undergoes a further extension to classify the defect type (loose-meant, packaging error, twisted meat, unsealed, wrinkles). This has been designed for a human in the loop setting, flagged trays will to an inspector, hence the system will never accept or reject a product on its own.  
